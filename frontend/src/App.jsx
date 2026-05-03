@@ -184,7 +184,7 @@ function App() {
               <FrontierChart data={results} simulation={results.simulation} />
             </div>
             <WeightsChart optimal={results.optimal} tickers={results.tickers} />
-            <StatsTable optimal={results.optimal} tickers={results.tickers} />
+            <StatsTable optimal={results.optimal} tickers={results.tickers} riskFreeRate={sidebarInput.riskFreeRatePercent / 100} />
             {correlationData ? (
               <CorrelationHeatmap data={correlationData} />
             ) : (
@@ -201,6 +201,7 @@ function App() {
                 weights={results.optimal?.weights ?? []}
                 start={lastQuery?.start ?? "2020-01-01"}
                 end={lastQuery?.end ?? new Date().toISOString().split("T")[0]}
+                riskFreeRate={sidebarInput.riskFreeRatePercent / 100}
               />
             </div>
             <div className="xl:col-span-2">

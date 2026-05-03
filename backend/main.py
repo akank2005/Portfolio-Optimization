@@ -228,7 +228,10 @@ def optimize(payload: OptimizeRequest) -> dict:
 
     # Reconstruct daily portfolio returns using optimal weights
     portfolio_daily_returns = returns.values @ optimal["weights"]
-    sortino = compute_sortino(portfolio_daily_returns, risk_free_rate)
+    # Convert numpy array to pandas Series for compute_sortino
+    import pandas as pd
+    portfolio_daily_returns_series = pd.Series(portfolio_daily_returns, index=returns.index)
+    sortino = compute_sortino(portfolio_daily_returns_series, risk_free_rate)
 
     optimal_response = {
         "return": float(optimal["return"]),

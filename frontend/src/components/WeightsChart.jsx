@@ -110,25 +110,10 @@ function WeightsChart({ optimal, tickers = [] }) {
     };
   }, [pieData]);
 
-  const zeroWeightBanner =
-    excludedTickerNames.length > 0 ? (
-      <div className="mb-3 rounded-xl border border-blue-900/50 bg-blue-950/30 px-4 py-3 text-sm leading-relaxed text-slate-300">
-        <p>
-          Some assets were assigned 0% weight. This is mathematically correct — the optimizer found that these assets
-          did not improve the portfolio&apos;s risk-return tradeoff given your other selections.
-        </p>
-        <p className="mt-2 text-xs text-slate-400">
-          <span className="font-medium text-slate-400">Excluded: </span>
-          <span className="font-medium text-slate-200">{excludedTickerNames.join(", ")}</span>
-        </p>
-      </div>
-    ) : null;
-
   if (!pieData.values.length) {
     return (
       <div className="rounded-xl border border-slate-800 bg-[#161b2e] p-4 shadow-sm">
         <p className="mb-2 text-[13px] uppercase tracking-[0.18em] text-slate-400">Allocation</p>
-        {zeroWeightBanner}
         <div className="rounded-lg border border-slate-700 bg-[#111827] p-6 text-center text-sm text-slate-400">
           No allocation data above 1% to display yet.
         </div>
@@ -139,7 +124,6 @@ function WeightsChart({ optimal, tickers = [] }) {
   return (
     <div className="rounded-xl border border-slate-800 bg-[#161b2e] p-4 shadow-sm">
       <p className="mb-2 text-[13px] uppercase tracking-[0.18em] text-slate-400">Allocation</p>
-      {zeroWeightBanner}
       {plotlyError && <p className="mb-3 text-sm text-rose-600">{plotlyError}</p>}
       <div ref={chartRef} className="h-[420px] w-full" />
     </div>

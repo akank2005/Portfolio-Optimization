@@ -411,13 +411,31 @@ def compute_sortino(returns, risk_free_rate=0.04):
         risk_free_rate: Annual risk-free rate used in Sortino calculation.
     
     Returns:
-        float: Sortino ratio rounded to 2 decimal places, or None if downside std is 0.
+        float: Sortino ratio rounded to 2 decimal places, or None if calculation fails.
     """
-    excess_returns = returns - (risk_free_rate / 252)
-    downside_returns = excess_returns[excess_returns < 0]
-    downside_std = np.sqrt(252) * downside_returns.std()
+    import pandas as pd
     
-    if downside_std == 0 or np.isnan(downside_std):
+    # Ensure returns is a pandas Series
+    if not isinstance(returns, pd.Series):
+        returns = pd.Series(returns)
+    
+    # Remove NaN values
+    returns = returns.dropna()
+    
+    if len(returns) == 0:
+        return None
+    
+    daily_riskfree = risk_free_rate / 252
+    excess_returns = returns - daily_riskfree
+    downside_returns = excess_returns[excess_returns < 0]
+    
+    if len(downside_returns) == 0:
+        # No downside returns; use a small value to avoid division by zero
+        downside_std = 1e-10
+    else:
+        downside_std = np.sqrt(252) * downside_returns.std()
+    
+    if downside_std == 0 or np.isnan(downside_std) or downside_std <= 1e-10:
         return None
     
     annualized_return = returns.mean() * 252

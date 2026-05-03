@@ -15,6 +15,23 @@ function formatSharpe(value) {
   return value.toFixed(2);
 }
 
+function getShareColorClass(sharpe) {
+  const s = Number(sharpe);
+  if (!Number.isFinite(s)) return "text-slate-500";
+  if (s >= 1.5) return "text-emerald-400";
+  if (s >= 1.0) return "text-blue-400";
+  if (s >= 0) return "text-amber-400";
+  return "text-red-400";
+}
+
+function getSortinoColorClass(sortino) {
+  const s = Number(sortino);
+  if (!Number.isFinite(s) || s === null) return "text-slate-500";
+  if (s >= 2.0) return "text-emerald-400";
+  if (s >= 1.0) return "text-blue-400";
+  return "text-amber-400";
+}
+
 function isMinimalOrZeroWeight(weight) {
   const w = Number(weight);
   if (!Number.isFinite(w)) {
@@ -23,7 +40,7 @@ function isMinimalOrZeroWeight(weight) {
   return w <= 0 || w < 0.01;
 }
 
-function StatsTable({ optimal, tickers = [] }) {
+function StatsTable({ optimal, tickers = [], riskFreeRate = 0.04 }) {
   const { rows, excludedTickerNames } = useMemo(() => {
     const weights = Array.isArray(optimal?.weights) ? optimal.weights : [];
     const built = weights.map((weight, idx) => ({
@@ -51,7 +68,7 @@ function StatsTable({ optimal, tickers = [] }) {
         </div>
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-4">
         <div className="rounded-xl border border-emerald-900/40 bg-emerald-900/10 p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Expected Annual Return</p>
           <p className="mt-2 text-3xl font-bold tabular-nums text-emerald-400">{formatPercent(optimal.return)}</p>
@@ -64,9 +81,25 @@ function StatsTable({ optimal, tickers = [] }) {
 
         <div className="rounded-xl border border-slate-700 bg-[#111827] p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Sharpe Ratio</p>
-          <p className="mt-2 text-3xl font-bold tabular-nums text-slate-100">{formatSharpe(Number(optimal.sharpe))}</p>
+          <p className={`mt-2 text-3xl font-bold tabular-nums ${getShareColorClass(optimal.sharpe)}`}>
+            {formatSharpe(Number(optimal.sharpe))}
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-slate-700 bg-[#111827] p-4 group relative">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Sortino Ratio</p>
+          <p className={`mt-2 text-3xl font-bold tabular-nums ${optimal.sortino !== null && optimal.sortino !== undefined ? getSortinoColorClass(optimal.sortino) : "text-slate-500"}`}>
+            {optimal.sortino !== null && optimal.sortino !== undefined ? optimal.sortino.toFixed(2) : "N/A"}
+          </p>
+          <div className="absolute bottom-full left-1/2 mb-2 hidden -translate-x-1/2 transform rounded-lg bg-slate-900 px-3 py-2 text-xs text-slate-200 whitespace-nowrap group-hover:block border border-slate-700 shadow-lg z-10">
+            Penalizes only downside volatility; higher is better. &gt;1.0 is good.
+          </div>
         </div>
       </div>
+
+      <p className="mb-4 text-xs text-slate-500">
+        Ratios calculated using annualized returns vs {(riskFreeRate * 100).toFixed(2)}% risk-free rate
+      </p>
 
       {excludedTickerNames.length > 0 && (
         <div className="mb-4 rounded-xl border border-blue-900/50 bg-blue-950/30 px-4 py-3 text-sm leading-relaxed text-slate-300">

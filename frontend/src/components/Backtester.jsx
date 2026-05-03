@@ -11,7 +11,7 @@ function formatPercent(value) {
   return `${value.toFixed(2)}%`;
 }
 
-function Backtester({ tickers = [], weights = [], start, end }) {
+function Backtester({ tickers = [], weights = [], start, end, riskFreeRate = 0.04 }) {
   const comparisonChartRef = useRef(null);
   const drawdownChartRef = useRef(null);
 
@@ -42,6 +42,7 @@ function Backtester({ tickers = [], weights = [], start, end }) {
           weights,
           start,
           end,
+          risk_free_rate: riskFreeRate,
         });
         if (isMounted) {
           setBacktest(response.data);
@@ -63,7 +64,7 @@ function Backtester({ tickers = [], weights = [], start, end }) {
     return () => {
       isMounted = false;
     };
-  }, [hasValidInputs, tickers, weights, start, end]);
+  }, [hasValidInputs, tickers, weights, start, end, riskFreeRate]);
 
   useEffect(() => {
     if (!backtest) {
