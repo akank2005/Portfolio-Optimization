@@ -181,7 +181,7 @@ function App() {
         {results && !loading && (
           <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
             <div className="xl:col-span-2">
-              <FrontierChart data={results} simulation={results.simulation} />
+              <FrontierChart data={results} simulation={results.simulation} strategy={selectedStrategy} />
             </div>
             <WeightsChart optimal={results.optimal} tickers={results.tickers} />
             <StatsTable optimal={results.optimal} tickers={results.tickers} riskFreeRate={sidebarInput.riskFreeRatePercent / 100} />

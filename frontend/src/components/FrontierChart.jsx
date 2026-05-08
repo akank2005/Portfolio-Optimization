@@ -6,7 +6,7 @@ function toPercent(value) {
   return Number.isFinite(value) ? value * 100 : null;
 }
 
-function FrontierChart({ data, simulation }) {
+function FrontierChart({ data, simulation, strategy = "max_sharpe" }) {
   const chartRef = useRef(null);
   const [plotlyError, setPlotlyError] = useState("");
 
@@ -15,6 +15,53 @@ function FrontierChart({ data, simulation }) {
   const tickers = useMemo(() => data?.tickers ?? [], [data]);
   const assetPoints = useMemo(() => data?.assets ?? [], [data]);
   const simulationData = useMemo(() => simulation ?? data?.simulation ?? null, [simulation, data]);
+
+  const optimalMarker = useMemo(() => {
+    const baseMarker = (() => {
+      switch (strategy) {
+        case "min_variance":
+          return {
+            name: "Min Variance",
+            color: "#3b82f6",
+            symbol: "diamond",
+            hoverLabel: "Min Variance",
+          };
+        case "risk_parity":
+          return {
+            name: "Risk Parity",
+            color: "#10b981",
+            symbol: "circle",
+            hoverLabel: "Risk Parity",
+          };
+        case "max_return":
+          return {
+            name: "Max Return",
+            color: "#f97316",
+            symbol: "triangle-up",
+            hoverLabel: "Max Return",
+          };
+        case "max_sharpe":
+        default:
+          return {
+            name: "Max Sharpe",
+            color: "#f59e0b",
+            symbol: "star",
+            hoverLabel: "Max Sharpe",
+          };
+      }
+    })();
+
+    if (strategy === "max_return" && optimal?.constraint_infeasible) {
+      return {
+        name: "Constraint Infeasible — showing Min Variance instead",
+        color: "#ef4444",
+        symbol: "x",
+        hoverLabel: "Constraint Infeasible — showing Min Variance instead",
+      };
+    }
+
+    return baseMarker;
+  }, [strategy, optimal]);
 
   useEffect(() => {
     let isMounted = true;
@@ -55,17 +102,17 @@ function FrontierChart({ data, simulation }) {
       const optimalTrace = {
         type: "scatter",
         mode: "markers",
-        name: "Max Sharpe",
+        name: optimalMarker.name,
         x: [toPercent(optimal.volatility)],
         y: [toPercent(optimal.return)],
         marker: {
-          color: "#f59e0b",
+          color: optimalMarker.color,
           size: 16,
-          symbol: "star",
+          symbol: optimalMarker.symbol,
           line: { color: "#92400e", width: 1.5 },
         },
         hovertemplate:
-          "Max Sharpe<br>Volatility: %{x:.2f}%<br>Return: %{y:.2f}%<br>Sharpe: " +
+          `${optimalMarker.hoverLabel}<br>Volatility: %{x:.2f}%<br>Return: %{y:.2f}%<br>Sharpe: ` +
           `${Number.isFinite(optimal.sharpe) ? optimal.sharpe.toFixed(2) : "N/A"}` +
           "<extra></extra>",
       };
@@ -173,7 +220,7 @@ function FrontierChart({ data, simulation }) {
     return () => {
       isMounted = false;
     };
-  }, [frontier, optimal, tickers, assetPoints, simulationData]);
+  }, [frontier, optimal, tickers, assetPoints, simulationData, optimalMarker]);
 
   if (!frontier.length || !optimal) {
     return (

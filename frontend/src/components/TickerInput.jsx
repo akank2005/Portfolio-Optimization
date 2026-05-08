@@ -31,39 +31,59 @@ export function PortfolioInputProvider({ loading = false, onInputStateChange, ch
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
+  const [rawConstraints, setRawConstraints] = useState({});
+
+  const parseConstraintValue = useCallback((value) => {
+    const trimmed = String(value).trim();
+    if (trimmed === "") {
+      return null;
+    }
+    const parsed = Number(trimmed);
+    if (Number.isNaN(parsed)) {
+      return null;
+    }
+    return Math.min(100, Math.max(0, parsed));
+  }, []);
+
+  const constraintsFromInput = useMemo(
+    () =>
+      tickers.map((t) => {
+        const raw = rawConstraints[t.ticker] || { min: "", max: "" };
+        const min = parseConstraintValue(raw.min);
+        const max = parseConstraintValue(raw.max);
+        return {
+          ticker: t.ticker,
+          min: min === null ? null : min / 100,
+          max: max === null ? null : max / 100,
+        };
+      }),
+    [tickers, rawConstraints, parseConstraintValue]
+  );
+
   useEffect(() => {
     const rf = Number(riskFreeRate);
     onInputStateChange?.({
-      tickers: tickers.map(t => t.ticker),
+      tickers: tickers.map((t) => t.ticker),
       start,
       end,
       riskFreeRatePercent: Number.isFinite(rf) ? rf : 0,
-      constraints: tickers,
+      constraints: constraintsFromInput,
     });
-  }, [tickers, start, end, riskFreeRate, onInputStateChange]);
+  }, [constraintsFromInput, end, onInputStateChange, riskFreeRate, start, tickers]);
 
   const validateConstraints = useCallback(() => {
-    for (let i = 0; i < tickers.length; i++) {
-      const t = tickers[i];
-      if (t.min !== null && t.max !== null && t.min > t.max) {
-        return `${t.ticker}: Min must be ≤ Max`;
+    for (let i = 0; i < constraintsFromInput.length; i++) {
+      const { ticker, min, max } = constraintsFromInput[i];
+      if (min !== null && max !== null && min > max) {
+        return `${ticker}: Min must be ≤ Max`;
       }
     }
-    const sumMins = tickers.reduce((sum, t) => sum + (t.min || 0), 0);
-    if (sumMins >= 100) {
+    const sumMins = constraintsFromInput.reduce((sum, c) => sum + (c.min || 0), 0);
+    if (sumMins >= 1) {
       return "Sum of all minimums must be < 100%";
     }
     return "";
-  }, [tickers]);
-
-  const updateConstraint = useCallback((tickerName, field, value) => {
-    const numValue = value === "" ? null : Math.max(0, Math.min(1, Number(value) || 0));
-    setTickers((prev) =>
-      prev.map((t) =>
-        t.ticker === tickerName ? { ...t, [field]: numValue } : t
-      )
-    );
-  }, []);
+  }, [constraintsFromInput]);
 
   const addTicker = useCallback(() => {
     const normalized = normalizeTicker(tickerInput);
@@ -78,12 +98,21 @@ export function PortfolioInputProvider({ loading = false, onInputStateChange, ch
     }
 
     setTickers((prev) => [...prev, { ticker: normalized, min: null, max: null }]);
+    setRawConstraints((prev) => ({
+      ...prev,
+      [normalized]: { min: "", max: "" },
+    }));
     setTickerInput("");
     setError("");
   }, [tickerInput, tickers]);
 
   const removeTicker = useCallback((tickerToRemove) => {
     setTickers((prev) => prev.filter((t) => t.ticker !== tickerToRemove));
+    setRawConstraints((prev) => {
+      const next = { ...prev };
+      delete next[tickerToRemove];
+      return next;
+    });
     setError("");
   }, []);
 
@@ -100,6 +129,10 @@ export function PortfolioInputProvider({ loading = false, onInputStateChange, ch
       }
 
       setTickers((prev) => [...prev, { ticker: normalized, min: null, max: null }]);
+      setRawConstraints((prev) => ({
+        ...prev,
+        [normalized]: { min: "", max: "" },
+      }));
       setTickerInput("");
       setSuggestions([]);
       setShowSuggestions(false);
@@ -165,7 +198,8 @@ export function PortfolioInputProvider({ loading = false, onInputStateChange, ch
       removeTicker,
       addTickerFromValue,
       handleTickerKeyDown,
-      updateConstraint,
+      rawConstraints,
+      setRawConstraints,
       validateConstraints,
     }),
     [
@@ -182,7 +216,8 @@ export function PortfolioInputProvider({ loading = false, onInputStateChange, ch
       removeTicker,
       addTickerFromValue,
       handleTickerKeyDown,
-      updateConstraint,
+      rawConstraints,
+      setRawConstraints,
       validateConstraints,
     ]
   );
@@ -203,8 +238,9 @@ export function TickerSearchColumn() {
     removeTicker,
     addTickerFromValue,
     handleTickerKeyDown,
+    rawConstraints,
+    setRawConstraints,
     error,
-    updateConstraint,
     validateConstraints,
   } = usePortfolioInput();
 
@@ -257,32 +293,32 @@ export function TickerSearchColumn() {
         <div className="space-y-3">
           <div className="space-y-1">
             {tickers.map((ticker) => (
-              <div key={ticker.ticker} className="border-b border-slate-700/50 py-2.5 last:border-0">
-                <div className="flex items-end gap-4">
+              <div key={ticker.ticker} className="border-b border-slate-700/50 py-3 last:border-0">
+                <div className="flex items-center gap-4">
                   {/* Ticker name */}
-                  <div className="min-w-fit">
-                    <span className="text-[13px] font-medium text-slate-100">{ticker.ticker}</span>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-sm font-medium text-slate-100">{ticker.ticker}</span>
                   </div>
 
                   {/* Min % input */}
                   <div className="flex flex-col">
                     <label className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Min %</label>
                     <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.1"
-                      value={ticker.min !== null ? (ticker.min * 100).toFixed(1) : ""}
-                      onChange={(e) =>
-                        updateConstraint(
-                          ticker.ticker,
-                          "min",
-                          e.target.value === "" ? "" : Number(e.target.value) / 100
-                        )
-                      }
+                      type="text"
+                      value={rawConstraints[ticker.ticker]?.min ?? ""}
+                      onChange={(e) => {
+                        const rawValue = e.target.value;
+                        setRawConstraints((prev) => ({
+                          ...prev,
+                          [ticker.ticker]: {
+                            ...(prev[ticker.ticker] || {}),
+                            min: rawValue,
+                          },
+                        }));
+                      }}
                       placeholder="0"
                       disabled={loading}
-                      className="w-[70px] rounded border border-slate-700 bg-[#111827] px-2 py-1.5 text-sm text-slate-100 placeholder:text-slate-500 outline-none focus:border-blue-500"
+                      className="w-[80px] rounded-lg border border-slate-700 bg-[#111827] px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
                     />
                   </div>
 
@@ -290,21 +326,19 @@ export function TickerSearchColumn() {
                   <div className="flex flex-col">
                     <label className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Max %</label>
                     <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.1"
-                      value={ticker.max !== null ? (ticker.max * 100).toFixed(1) : ""}
-                      onChange={(e) =>
-                        updateConstraint(
-                          ticker.ticker,
-                          "max",
-                          e.target.value === "" ? "" : Number(e.target.value) / 100
-                        )
-                      }
-                      placeholder="100"
-                      disabled={loading}
-                      className="w-[70px] rounded border border-slate-700 bg-[#111827] px-2 py-1.5 text-sm text-slate-100 placeholder:text-slate-500 outline-none focus:border-blue-500"
+                      type="text"
+                      value={rawConstraints[ticker.ticker]?.max ?? ""}
+                      onChange={(e) => {
+                        const rawValue = e.target.value;
+                        setRawConstraints((prev) => ({
+                          ...prev,
+                          [ticker.ticker]: {
+                            ...(prev[ticker.ticker] || {}),
+                            max: rawValue,
+                          },
+                        }));
+                      }}
+                      className="w-[80px] rounded-lg border border-slate-700 bg-[#111827] px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
                     />
                   </div>
 
@@ -316,10 +350,12 @@ export function TickerSearchColumn() {
                     type="button"
                     onClick={() => removeTicker(ticker.ticker)}
                     disabled={loading}
-                    className="text-slate-400 transition hover:text-rose-400 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="ml-2 rounded p-1 text-slate-400 transition hover:bg-slate-700 hover:text-rose-400 disabled:cursor-not-allowed disabled:opacity-50"
                     aria-label={`Remove ${ticker.ticker}`}
                   >
-                    ×
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
                   </button>
                 </div>
               </div>

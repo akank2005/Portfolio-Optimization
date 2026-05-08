@@ -282,10 +282,14 @@ def max_return_for_risk(mu, sigma, max_volatility, risk_free_rate=0.04, constrai
     if max_volatility <= 0:
         raise ValueError("max_volatility must be positive.")
 
-    # Ensure the risk cap is feasible for long-only fully-invested portfolios.
-    # If user-provided cap is too low, fall back to the minimum feasible volatility.
+    max_vol = float(max_volatility) / 100.0
+    if max_vol <= 0:
+        raise ValueError("max_volatility must be greater than 0%.")
+
     min_var_port = min_variance(mu, sigma, risk_free_rate, constraints)
-    effective_max_volatility = max(float(max_volatility), float(min_var_port["volatility"]))
+    if max_vol < float(min_var_port["volatility"]) - 1e-12:
+        min_var_port["constraint_infeasible"] = True
+        return min_var_port
 
     n_assets = mu.size
     bounds = []
@@ -306,7 +310,7 @@ def max_return_for_risk(mu, sigma, max_volatility, risk_free_rate=0.04, constrai
 
     def volatility_constraint(weights):
         variance = float(weights.T @ sigma @ weights)
-        return float(effective_max_volatility - np.sqrt(max(variance, 0.0)))
+        return float(max_vol - np.sqrt(max(variance, 0.0)))
 
     constraints = [
         {"type": "eq", "fun": lambda w: float(np.sum(w) - 1.0)},
@@ -322,7 +326,8 @@ def max_return_for_risk(mu, sigma, max_volatility, risk_free_rate=0.04, constrai
         options={"ftol": 1e-12, "maxiter": 1000},
     )
     if not result.success:
-        raise ValueError("Failed to solve max-return-for-risk portfolio.")
+        min_var_port["constraint_infeasible"] = True
+        return min_var_port
 
     weights = np.asarray(result.x, dtype=float)
     weights = np.clip(weights, [b[0] for b in bounds], [b[1] for b in bounds])
@@ -330,6 +335,10 @@ def max_return_for_risk(mu, sigma, max_volatility, risk_free_rate=0.04, constrai
 
     port_return = float(weights @ mu)
     port_vol = float(np.sqrt(max(weights.T @ sigma @ weights, 0.0)))
+    if port_vol > max_vol + 1e-8:
+        min_var_port["constraint_infeasible"] = True
+        return min_var_port
+
     sharpe = (port_return - risk_free_rate) / port_vol if port_vol > 0 else np.nan
 
     return {
@@ -337,6 +346,7 @@ def max_return_for_risk(mu, sigma, max_volatility, risk_free_rate=0.04, constrai
         "volatility": port_vol,
         "sharpe": float(sharpe),
         "weights": weights,
+        "constraint_infeasible": False,
     }
 
 

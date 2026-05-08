@@ -239,6 +239,7 @@ def optimize(payload: OptimizeRequest) -> dict:
         "sharpe": float(optimal["sharpe"]),
         "sortino": sortino,
         "weights": [float(w) for w in optimal["weights"]],
+        "constraint_infeasible": bool(optimal.get("constraint_infeasible", False)),
     }
 
     return {
