@@ -23,7 +23,7 @@ app = FastAPI(title="Portfolio Optimizer API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -293,6 +293,11 @@ def backtest(payload: BacktestRequest) -> dict:
         raise HTTPException(status_code=500, detail="Backtest failed due to an internal error.") from exc
 
     return result
+
+
+@app.post("/alerts/check")
+def alerts_check():
+    return {"status": "ok"}
 
 
 if __name__ == "__main__":

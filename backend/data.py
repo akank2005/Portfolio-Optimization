@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import numpy as np
 import pandas as pd
 import yfinance as yf
@@ -26,13 +27,26 @@ def fetch_prices(tickers: list[str], start: str, end: str) -> pd.DataFrame:
     if not cleaned_tickers:
         raise ValueError("No valid tickers provided.")
 
-    downloaded = yf.download(
-        cleaned_tickers,
-        start=start,
-        end=end,
-        auto_adjust=False,
-        progress=False,
-    )
+    try:
+        downloaded = yf.download(
+            cleaned_tickers,
+            start=start,
+            end=end,
+            auto_adjust=False,
+            progress=False,
+        )
+    except Exception as exc:
+        message = str(exc)
+        missing = re.findall(r"Quote not found for symbol: ([A-Z0-9\.-]+)", message)
+        if missing:
+            raise ValueError(
+                f"Unable to fetch price data because the following symbols were not found or may be delisted: {', '.join(missing)}."
+            ) from exc
+        if "possibly delisted" in message.lower() or "no timezone found" in message.lower():
+            raise ValueError(
+                f"Unable to fetch price data because one or more requested symbols may be delisted or invalid: {', '.join(cleaned_tickers)}."
+            ) from exc
+        raise
 
     if downloaded.empty:
         raise ValueError("No price data returned for the requested date range.")

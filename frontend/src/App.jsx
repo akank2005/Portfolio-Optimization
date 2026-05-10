@@ -33,6 +33,8 @@ function App() {
     tickers: [],
     start: "2020-01-01",
     end: getTodayISODate(),
+    riskFreeRatePercent: 4.5,
+    constraints: [],
   });
 
   const sidebarCanOptimize = useMemo(() => {
@@ -49,7 +51,14 @@ function App() {
     setError("");
 
     try {
-      const payload = { tickers, start, end, strategy, risk_free_rate: riskFreeRatePercent / 100 };
+      const rateValue = Number(riskFreeRatePercent);
+      const payload = {
+        tickers,
+        start,
+        end,
+        strategy,
+        risk_free_rate: Number.isFinite(rateValue) ? rateValue / 100 : 0.04,
+      };
       if (strategy === "max_return") {
         payload.max_volatility = Number(maxVol) / 100;
       }
@@ -72,6 +81,12 @@ function App() {
       const apiMessage = err?.response?.data?.detail;
       const fallbackMessage =
         "Unable to optimize portfolio right now. Check your input values and make sure the backend is running.";
+      console.error("Optimization failed:", {
+        status: err?.response?.status,
+        detail: apiMessage,
+        tickers,
+        fullError: err,
+      });
       setResults(null);
       setCorrelationData(null);
       setError(typeof apiMessage === "string" ? apiMessage : fallbackMessage);
@@ -82,10 +97,18 @@ function App() {
 
   const handleOptimizeClick = useCallback(async () => {
     const { tickers, start, end, riskFreeRatePercent, constraints } = sidebarInput;
-    if (tickers.length < 2 || !start || !end || start > end || loading) {
+    const parsedRate = Number(riskFreeRatePercent);
+    if (
+      tickers.length < 2 ||
+      !start ||
+      !end ||
+      start > end ||
+      loading ||
+      !Number.isFinite(parsedRate)
+    ) {
       return;
     }
-    await runOptimization(tickers, start, end, selectedStrategy, maxVolatility, riskFreeRatePercent, constraints);
+    await runOptimization(tickers, start, end, selectedStrategy, maxVolatility, parsedRate, constraints);
   }, [sidebarInput, loading, runOptimization, selectedStrategy, maxVolatility]);
 
   const handleStrategyChange = useCallback(
